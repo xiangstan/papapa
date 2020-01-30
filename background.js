@@ -1,14 +1,21 @@
-function getTabs(id, url) {
-  chrome.tabs.query({url: url}, function(tabs) {
-    chrome.tabs.sendMessage(id, {"message": "My Message: "+encodeURI(url), newTab: tabs})
-  });
+async function createTab(url) {
+  return new Promise(resolve => {
+    chrome.tabs.create({url: url, active: false}, async tab => {
+      chrome.tabs.onUpdated.addListener(function listener (tabId, info) {
+        if (info.status === "complete" && tabId === tab.id) {
+          chrome.tabs.onUpdated.removeListener(listener);
+		  chrome.extension.getBackgroundPage().console.log(tab)
+          resolve(tab);
+        }
+	  })
+	})
+  })
 }
 
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     const activeTab = tabs[0]
-    const myTime=new Date()
-	chrome.tabs.create({url: message.message, active: false})
-	const newTab=getTabs(activeTab.id, message.message)
+    let newTab = (async (tab) => await createTab(message.message))()
+	chrome.tabs.sendMessage(activeTab.id, {"message": "My Message: "+message.message, newTab: newTab})
   })
 });
